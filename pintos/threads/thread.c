@@ -62,7 +62,7 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
-static bool tick_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool tick_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -94,7 +94,7 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
    It is not safe to call thread_current() until this function
    finishes. */
 
-static bool 
+bool 
 tick_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
 	struct thread *ta = list_entry(a,struct thread,elem);
 	struct thread *tb = list_entry(b,struct thread,elem);

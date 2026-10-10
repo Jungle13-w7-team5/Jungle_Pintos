@@ -105,15 +105,21 @@ sema_try_down (struct semaphore *sema) {
 void
 sema_up (struct semaphore *sema) {
 	enum intr_level old_level;
+	struct thread *t = NULL;
 
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
-	if (!list_empty (&sema->waiters))
-		thread_unblock (list_entry (list_pop_front (&sema->waiters),
-					struct thread, elem));
+	if (!list_empty (&sema->waiters)){
+		t = list_entry (list_pop_front (&sema->waiters),struct thread, elem);
+		thread_unblock (t);
+	}
 	sema->value++;
 	intr_set_level (old_level);
+	if(t !=NULL){
+		if(t->priority > thread_current()->priority){
+				thread_yield();
+			}}
 }
 
 static void sema_test_helper (void *sema_);
@@ -283,8 +289,8 @@ cond_wait (struct condition *cond, struct lock *lock) {
 
 	sema_init (&waiter.semaphore, 0);
 	list_push_back (&cond->waiters, &waiter.elem);
-	lock_release (lock);
-	sema_down (&waiter.semaphore);
+	lock_release (lock); //락 내려 놓기
+	sema_down (&waiter.semaphore); //잠들기
 	lock_acquire (lock);
 }
 
@@ -302,9 +308,29 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	ASSERT (!intr_context ());
 	ASSERT (lock_held_by_current_thread (lock));
 
-	if (!list_empty (&cond->waiters))
-		sema_up (&list_entry (list_pop_front (&cond->waiters),
-					struct semaphore_elem, elem)->semaphore);
+	struct thread *t;
+	struct semaphore_elem *e;
+	struct semaphore_elem *max;
+	struct list_elem *n;
+	int num;
+	
+	if (!list_empty (&cond->waiters)){
+		n = list_begin(&cond->waiters);
+		e = list_entry (n,struct semaphore_elem, elem);
+		max = list_entry (n,struct semaphore_elem, elem);
+		num = list_entry(list_begin(&e->semaphore.waiters),struct thread,elem)->priority;
+		while(n != list_end(&cond->waiters)){
+			if(num < list_entry(list_begin(&e->semaphore.waiters),struct thread,elem)->priority){
+				num = list_entry(list_begin(&e->semaphore.waiters),struct thread,elem)->priority;
+				max = list_entry (n,struct semaphore_elem, elem);
+			}
+			n = list_next(n);
+			e = list_entry (n,struct semaphore_elem, elem);
+		}
+		list_remove (&max->elem);
+		sema_up (&max->semaphore);}
+		
+		
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
