@@ -29,6 +29,9 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 
+/**/
+static struct list sleep_list;
+/**/
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
@@ -42,6 +45,7 @@ timer_init (void) {
 	outb (0x40, count & 0xff);
 	outb (0x40, count >> 8);
 
+	list_init(&sleep_list);
 	intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
 
@@ -71,6 +75,7 @@ timer_calibrate (void) {
 }
 
 /* Returns the number of timer ticks since the OS booted. */
+// 여기는 처음에 타임 tick을 받고 intr_set_level()에서 
 int64_t
 timer_ticks (void) {
 	enum intr_level old_level = intr_disable ();
@@ -90,17 +95,26 @@ timer_elapsed (int64_t then) {
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
+	if (ticks <=0){
+		return ;
+	}
 	int64_t start = timer_ticks ();
-
+	struct thread *t;
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	intr_disable();
+	
+
+	t = thread_current();
+	t->wekeup_tick = start + ticks;                
+	list_push_back (&sleep_list, &t->elem);
+	thread_block();
+	intr_enable();
 }
 
 /* Suspends execution for approximately MS milliseconds. */
 void
 timer_msleep (int64_t ms) {
-	real_time_sleep (ms, 1000);
+	real_time_sleep (ms, 1000); //1
 }
 
 /* Suspends execution for approximately US microseconds. */
@@ -125,6 +139,17 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
+	struct list_elem *e;
+	for (e = list_begin (&sleep_list); e != list_end (&sleep_list); ) {
+    	struct thread *t = list_entry (e, struct thread, elem);
+		if(t->wekeup_tick <= ticks){
+			e = list_remove(e);
+			thread_unblock(t);
+			
+		}else{
+			e = list_next (e);
+		}
+	}
 	thread_tick ();
 }
 
@@ -167,7 +192,7 @@ real_time_sleep (int64_t num, int32_t denom) {
 	   (NUM / DENOM) s
 	   ---------------------- = NUM * TIMER_FREQ / DENOM ticks.
 	   1 s / TIMER_FREQ ticks
-	   */
+	*/
 	int64_t ticks = num * TIMER_FREQ / denom;
 
 	ASSERT (intr_get_level () == INTR_ON);
