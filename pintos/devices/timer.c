@@ -29,12 +29,16 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 
+
+
 /**/
 static struct list sleep_list;
 /**/
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
+
+
 void
 timer_init (void) {
 	/* 8254 input frequency divided by TIMER_FREQ, rounded to
@@ -101,14 +105,15 @@ timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 	struct thread *t;
 	ASSERT (intr_get_level () == INTR_ON);
-	intr_disable();
+	enum intr_level old_level;
+	old_level = intr_disable();
 	
 
 	t = thread_current();
 	t->wekeup_tick = start + ticks;                
 	list_push_back (&sleep_list, &t->elem);
 	thread_block();
-	intr_enable();
+	intr_set_level(old_level);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
