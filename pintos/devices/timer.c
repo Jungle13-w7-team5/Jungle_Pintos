@@ -103,12 +103,12 @@ timer_sleep (int64_t ticks) {
 		return ;
 	}
 	int64_t start = timer_ticks ();
-	struct thread *t;
-	ASSERT (intr_get_level () == INTR_ON);
 	enum intr_level old_level;
-	old_level = intr_disable();
+	struct thread *t;
 	
-
+	ASSERT (intr_get_level () == INTR_ON);
+	
+	old_level = intr_disable();
 	t = thread_current();
 	t->wekeup_tick = start + ticks;                
 	list_push_back (&sleep_list, &t->elem);
