@@ -92,7 +92,7 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-	int64_t wekeup_tick;                           /* tick */
+	int64_t wakeup_tick;                           /* tick */
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
@@ -114,7 +114,7 @@ struct thread {
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
-bool tick_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool elem_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 void thread_init (void);
 void thread_start (void);
 
