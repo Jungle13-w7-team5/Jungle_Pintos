@@ -198,6 +198,19 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	struct thread *t = thread_current();
+	
+	if(!lock->holder == NULL){
+		if(lock->holder->priority < t->priority){
+			lock->holder->origin = lock->holder->priority;
+			lock->holder->priority = t->priority;
+			
+			// lock->holder->donations.donation_lock = lock;
+			// lock->holder->donations.priority = t->priority;
+		}else{
+			lock->holder->origin = NULL;
+		}
+	}
 	sema_down (&lock->semaphore);
 	lock->holder = thread_current ();
 }
@@ -231,7 +244,9 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
-
+	if(lock->holder->origin != NULL){
+		lock->holder->priority = lock->holder->origin;
+	}
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
 }
@@ -293,12 +308,13 @@ semaphore_elem_sort(const struct list_elem *a, const struct list_elem *b, void *
 	semap_two = list_entry (b,struct semaphore_elem, elem);
 	one = list_entry(list_begin(&semap_one->semaphore.waiters),struct thread,elem);
 	two = list_entry(list_begin(&semap_two->semaphore.waiters),struct thread,elem);
-	if(one->priority > two->priority){
-		return true;
-	}else{
-		return false;
-	}
-};
+	// if(one->priority > two->priority){
+	// 	return true;
+	// }else{
+	// 	return false;
+	// }
+	return one->priority > two->priority ? true :false;
+}
 
 void
 cond_wait (struct condition *cond, struct lock *lock) {

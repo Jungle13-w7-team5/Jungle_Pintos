@@ -218,9 +218,15 @@ thread_create (const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 	/* Add to run queue. */
+	
+	// struct lock *l = aux;
+	// struct semaphore_elem waiter;
+	
+	// if (l->holder != t){
+	// 	sema_init (&waiter.semaphore, 0);
+	// 	list_push_back (&l->semaphore.waiters, &waiter.elem);
+	// }
 	thread_unblock (t);
-
-
 	struct thread *ts;
 	ts = thread_current();
 	if(ts->priority < priority){
