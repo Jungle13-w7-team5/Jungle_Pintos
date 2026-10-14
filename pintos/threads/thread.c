@@ -122,7 +122,7 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
-
+	
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
 	init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -226,6 +226,8 @@ thread_create (const char *name, int priority,
 	// 	sema_init (&waiter.semaphore, 0);
 	// 	list_push_back (&l->semaphore.waiters, &waiter.elem);
 	// }
+	t->want_lock = NULL;
+	t->wait_lock_num = 0;
 	thread_unblock (t);
 	struct thread *ts;
 	ts = thread_current();
@@ -337,7 +339,17 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+
+	thread_current ()->origin = new_priority;
+	thread_current ()->priority = thread_current ()->origin;
+	if(thread_current()->wait_lock_num != 0){
+		for (int i = 0; i < thread_current()->wait_lock_num; i++){
+			if(thread_current () ->priority < thread_current()->wait_thread[i]->priority){
+				thread_current () ->priority = thread_current()->wait_thread[i]->priority;
+			}
+		}
+	}
+	
 	struct thread *t;
 	struct list_elem *e;
 	if(!list_empty(&ready_list)){
@@ -444,7 +456,9 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
-	
+	t->origin = priority;
+	t->wait_lock_num = 0;
+	t->want_lock = NULL;
 	
 }
 
