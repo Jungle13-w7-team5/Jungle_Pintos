@@ -28,6 +28,8 @@ static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
+static bool timer_sleep_sort(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
 
 /**/
 static struct list sleep_list;
@@ -35,6 +37,8 @@ static struct list sleep_list;
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
+
+
 void
 timer_init (void) {
 	/* 8254 input frequency divided by TIMER_FREQ, rounded to
@@ -95,20 +99,24 @@ timer_elapsed (int64_t then) {
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
+	int64_t start = timer_ticks ();
+	enum intr_level old_level;
+	struct thread *t;
+
+	ASSERT (intr_get_level () == INTR_ON);
+	
 	if (ticks <=0){
 		return ;
 	}
-	int64_t start = timer_ticks ();
-	struct thread *t;
-	ASSERT (intr_get_level () == INTR_ON);
-	intr_disable();
 	
+	old_level = intr_disable();
 
 	t = thread_current();
-	t->wekeup_tick = start + ticks;                
-	list_push_back (&sleep_list, &t->elem);
+	t->wakeup_tick = start + ticks;                
+	list_insert_ordered (&sleep_list, &t->elem,timer_sleep_sort,NULL);
 	thread_block();
-	intr_enable();
+
+	intr_set_level(old_level);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -139,18 +147,30 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
-	struct list_elem *e;
-	for (e = list_begin (&sleep_list); e != list_end (&sleep_list); ) {
-    	struct thread *t = list_entry (e, struct thread, elem);
-		if(t->wekeup_tick <= ticks){
-			e = list_remove(e);
-			thread_unblock(t);
-			
-		}else{
-			e = list_next (e);
-		}
+
+	struct list_elem *e = list_begin(&sleep_list);
+	struct thread *t = list_entry (e, struct thread, elem);
+
+	while((e != list_tail(&sleep_list))&&(t->wakeup_tick<=ticks)){
+		e = list_remove(e);
+		thread_unblock(t);
+		t = list_entry (e, struct thread, elem);
+		
 	}
 	thread_tick ();
+
+	// for 문으로 전체 탐색 방법을 timer_sleep_sort를 만들고 while문을 통해 전체 탐색x
+	// for (e = list_begin (&sleep_list); e != list_end (&sleep_list); ) {
+    // 	struct thread *t = list_entry (e, struct thread, elem);
+	// 	if(t->wakeup_tick <= ticks){
+	// 		e = list_remove(e);
+	// 		thread_unblock(t);
+			
+	// 	}else{
+	// 		e = list_next (e);
+	// 	}
+	// }
+	
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
@@ -207,5 +227,17 @@ real_time_sleep (int64_t num, int32_t denom) {
 		   down by 1000 to avoid the possibility of overflow. */
 		ASSERT (denom % 1000 == 0);
 		busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000));
+	}
+}
+
+static bool 
+timer_sleep_sort(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+	struct thread *one = list_entry(a,struct thread,elem);
+	struct thread *two = list_entry(b,struct thread,elem);
+
+	if(one->wakeup_tick < two->wakeup_tick){
+		return true;
+	}else{
+		return false;
 	}
 }

@@ -91,8 +91,14 @@ struct thread {
 	tid_t tid;                          /* Thread identifier. */
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
-	int priority;                       /* Priority. */
-	int64_t wekeup_tick;                           /* tick */
+	int priority;						/* Priority. */
+	int origin;                      
+	int64_t wakeup_tick;                           /* tick */
+	/**/
+	struct lock* want_lock;
+	struct thread* wait_thread[10];
+	int wait_lock_num;
+	/**/
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
@@ -114,7 +120,7 @@ struct thread {
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
-
+bool elem_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 void thread_init (void);
 void thread_start (void);
 
